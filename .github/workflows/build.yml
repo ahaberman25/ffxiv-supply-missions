@@ -1,11 +1,9 @@
-name: Build (Tag-versioned in CI)
+name: Build (CI downloads Dalamud DLLs)
 
 on:
   push:
-    tags:
-      - 'v*'          # tag builds (e.g., v0.0.1)
-    branches:
-      - main          # also build main (non-tag falls back)
+    tags:   [ 'v*' ]
+    branches: [ main ]
   pull_request:
 
 jobs:
@@ -16,47 +14,60 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # so git describe / tags work if you need them
+          fetch-depth: 0
 
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # OPTIONAL: If you need Dalamud / Lumina DLLs in CI, fetch your hooks bundle here
-      # - name: (Optional) Fetch Dalamud hooks
-      #   shell: pwsh
-      #   run: |
-      #     Invoke-WebRequest -Uri "$env:HOOKS_URL" -OutFile hooks_dev.zip
-      #     Expand-Archive hooks_dev.zip -DestinationPath "$env:USERPROFILE\AppData\Roaming\XIVLauncher\addon\Hooks\dev"
-      #   env:
-      #     HOOKS_URL: ${{ secrets.DALAMUD_HOOKS_URL }}
+      # Provide a secret DALAMUD_HOOKS_URL that points to your hooks_dev.zip
+      - name: Download Dalamud/Lumina pack
+        shell: pwsh
+        run: |
+          $hooks = "$env:RUNNER_TEMP\hooks_dev"
+          New-Item -ItemType Directory -Force -Path $hooks | Out-Null
+          $zip = "$env:RUNNER_TEMP\hooks_dev.zip"
+          Invoke-WebRequest -Uri "${{ secrets.DALAMUD_HOOKS_URL }}" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $hooks -Force
+          "HOOKS=$hooks" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Determine version from tag (if present)
+      - name: Determine version from tag (Option 3 behavior)
         id: version
         shell: pwsh
         run: |
           $ref = "${{ github.ref }}"
-          if ($ref -match '^refs/tags/v(\d+\.\d+\.\d+.*)$') {
-            $v = $matches[1]
-          } else {
-            # Fallback: keep local repo version but suffix a short SHA so artifacts are unique
-            $sha = "${{ github.sha }}".Substring(0,7)
-            $v = "0.0.1-ci-$sha"
-          }
-          Write-Host "Version=$v"
+          if ($ref -match '^refs/tags/v(\d+\.\d+\.\d+.*)$') { $v = $matches[1] }
+          else { $v = "0.0.1-ci-$("${{ github.sha }}".Substring(0,7))" }
           "VERSION=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Build + Pack
+      - name: Build
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          Write-Host "Building with version $version (CI-only override)"
-          pwsh build/pack.ps1 -Configuration Release -Version $version
+          dotnet build .\SupplyMissionHelper.csproj `
+            -c Release `
+            /p:Version="${{ steps.version.outputs.VERSION }}" `
+            /p:DalamudLibPath="$env:HOOKS\"
 
-      - name: Show dist
+      - name: Stage + Zip
         shell: pwsh
-        run: Get-ChildItem dist -Recurse | Format-Table -AutoSize
+        run: |
+          $outDir = "bin\Release"
+          $distRoot = "dist"
+          $dist = Join-Path $distRoot "SupplyMissionHelper"
+          $zip  = Join-Path $distRoot "SupplyMissionHelper-${{ steps.version.outputs.VERSION }}.zip"
+
+          if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
+          if (-not (Test-Path $distRoot)) { New-Item $distRoot -ItemType Directory | Out-Null }
+          New-Item $dist -ItemType Directory | Out-Null
+
+          Copy-Item "$outDir\SupplyMissionHelper.dll" $dist
+          if (Test-Path "$outDir\SupplyMissionHelper.pdb") { Copy-Item "$outDir\SupplyMissionHelper.pdb" $dist }
+          Copy-Item ".\manifest.json" $dist
+
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory($dist, $zip)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

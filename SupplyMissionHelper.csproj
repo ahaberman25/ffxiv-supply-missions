@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>SupplyMissionHelper</AssemblyName>
     <RootNamespace>SupplyMissionHelper</RootNamespace>
     <OutputType>Library</OutputType>
@@ -8,6 +12,9 @@
     <Authors>Andrew Haberman</Authors>
     <Company>FFXIV Supply Missions</Company>
     <Description>Aggregates GC supply/provisioning missions into a raw-materials shopping list.</Description>
+
+    <!-- Path is provided by CI via /p:DalamudLibPath=... -->
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == ''">$(MSBuildThisFileDirectory)third_party\hooks_dev\</DalamudLibPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,7 +22,6 @@
     <None Include="manifest.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- LOCAL references to Dalamud & friends from Hooks\dev -->
   <ItemGroup>
     <Reference Include="Dalamud">
       <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
@@ -39,7 +45,6 @@
     </Reference>
   </ItemGroup>
 
-  <!-- Put release DLLs in ./bin/Release and let pack.ps1 build the zip -->
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <Optimize>true</Optimize>
   </PropertyGroup>
