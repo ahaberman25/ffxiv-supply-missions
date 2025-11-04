@@ -1,0 +1,12 @@
+{
+  "Author": "Andrew Haberman",
+  "Name": "Supply Mission Helper",
+  "Punchline": "GC supply/provisioning → raw-material shopping list.",
+  "Description": "Reads today’s GC Supply & Provisioning missions and aggregates the required raw materials.",
+  "ApplicableVersion": "any",
+  "Tags": [ "Grand Company", "Supply", "Provisioning", "Crafting", "Gathering" ],
+  "RepoUrl": "https://example.com/your-repo",
+  "DalamudApiLevel": 13,
+  "IconUrl": "",
+  "EffectiveVersion": "1.0.0"
+}

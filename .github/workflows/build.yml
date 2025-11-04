@@ -1,0 +1,65 @@
+name: Build (Tag-versioned in CI)
+
+on:
+  push:
+    tags:
+      - 'v*'          # tag builds (e.g., v0.0.1)
+    branches:
+      - main          # also build main (non-tag falls back)
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # so git describe / tags work if you need them
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # OPTIONAL: If you need Dalamud / Lumina DLLs in CI, fetch your hooks bundle here
+      # - name: (Optional) Fetch Dalamud hooks
+      #   shell: pwsh
+      #   run: |
+      #     Invoke-WebRequest -Uri "$env:HOOKS_URL" -OutFile hooks_dev.zip
+      #     Expand-Archive hooks_dev.zip -DestinationPath "$env:USERPROFILE\AppData\Roaming\XIVLauncher\addon\Hooks\dev"
+      #   env:
+      #     HOOKS_URL: ${{ secrets.DALAMUD_HOOKS_URL }}
+
+      - name: Determine version from tag (if present)
+        id: version
+        shell: pwsh
+        run: |
+          $ref = "${{ github.ref }}"
+          if ($ref -match '^refs/tags/v(\d+\.\d+\.\d+.*)$') {
+            $v = $matches[1]
+          } else {
+            # Fallback: keep local repo version but suffix a short SHA so artifacts are unique
+            $sha = "${{ github.sha }}".Substring(0,7)
+            $v = "0.0.1-ci-$sha"
+          }
+          Write-Host "Version=$v"
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build + Pack
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          Write-Host "Building with version $version (CI-only override)"
+          pwsh build/pack.ps1 -Configuration Release -Version $version
+
+      - name: Show dist
+        shell: pwsh
+        run: Get-ChildItem dist -Recurse | Format-Table -AutoSize
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SupplyMissionHelper-${{ steps.version.outputs.VERSION }}
+          path: dist/**

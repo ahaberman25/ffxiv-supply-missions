@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <!-- Use .NET 9 and latest C# everywhere -->
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Try an environment variable first, then default Hooks\dev -->
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == '' And '$(DALAMUD_HOOKS)' != ''">$(DALAMUD_HOOKS)\</DalamudLibPath>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == ''">$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+
+    <!-- Output -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>
